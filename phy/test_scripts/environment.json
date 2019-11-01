@@ -1,0 +1,10 @@
+[{
+	"collab_network_type": "SATCOM",
+	"incumbent_protection": {
+		"center_frequency": 2000000000,
+		"modeled_frequency": 1001000000,
+		"rf_bandwidth": 5000000
+	},
+	"scenario_rf_bandwidth": 10000000,
+	"scenario_center_frequency": 1300000000
+}]

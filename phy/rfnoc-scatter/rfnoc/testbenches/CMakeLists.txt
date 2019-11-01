@@ -1,0 +1,4 @@
+add_subdirectory(noc_block_McFsource_tb)
+add_subdirectory(noc_block_scatterPHY_tb)
+add_subdirectory(noc_block_fir129_tb)
+add_subdirectory(noc_block_specsense2k_tb)

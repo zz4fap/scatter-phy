@@ -1,0 +1,6 @@
+fir129/noc_block_fir129.v \
+McFsource/cvita_hdr_encoder.v \
+McFsource/McFsource.v \
+McFsource/noc_block_McFsource.v \
+specsense16k/pkt_avg.v \
+specsense16k/noc_block_specsense16k.v \

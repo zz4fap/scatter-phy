@@ -1,0 +1,623 @@
+// [START declaration]
+syntax = "proto3";
+package communicator;
+
+import "interAI.proto";
+
+// [END declaration]
+
+// [START README]
+//
+// For each module there is one message that will be sent to the other modules. These messages are mf_tdma_update_cmd (for AI), phy_stat (for PHY) and mac_stat (for MAC).
+// All other statistics are embedded in these messages.
+//
+// [END README]
+
+// [START GLOBAL ENUMERATIONS]
+
+enum MODULE {
+	MODULE_UNKNOWN			= 0;
+	MODULE_PHY 				= 1;
+	MODULE_MAC 				= 2;
+	MODULE_AI				= 3;
+	MODULE_RF_MON			= 4;
+	MODULE_APP				= 5;
+	MODULE_PHY_DEBUG_1 		= 6;
+	MODULE_PHY_DEBUG_2 		= 7;
+	MODULE_MAC_DEBUG_1	    = 8;
+	MODULE_MAC_DEBUG_2      = 9;
+    MODULE_RADIO_API        = 10;
+    MODULE_NODE_COMM        = 11;
+    MODULE_GATEWAY_COMM     = 12;
+    MODULE_COLLAB_CLIENT    = 13;
+	MODULE_MANDATES			= 14;
+	MODULE_ENVIRONMENT		= 15;
+	MODULE_CHANNEL_EMULATOR = 16;
+};
+
+enum TRANSACTION_RESULT {
+	TRANSACTION_RESULT_UNKNOWN			= 0;
+	OK						= 100;
+	NOK						= 101;
+	TIMEOUT				= 102;
+	LBT_TIMEOUT	  = 103;
+};
+
+enum BW_INDEX {
+		BW_INDEX_UNKNOWN		= 0;
+		OneDotFour	= 1;	// 1.4 MHz
+		Three	   		= 2;	// 3 MHz
+		Five	   		= 3;	// 5 MHz
+		Ten		   		= 4;	// 10 MHz
+		Fifteen			= 5;	// 15 MHz
+    Twenty			= 6;	// 20 MHz
+		//WE WILL HAVE TO DEFINE ANOTHER BWs INDEXES TO BE USED IN THE RF MONITORING STATE.
+	};
+
+enum SLOT_MODE {
+    SLOT_MODE_UNKNOWN   = 0;
+    RX                  = 1;
+    TX                  = 2;
+};
+
+// [END GLOBAL ENUMERATIONS]
+
+
+// [START messages]
+
+
+// CTRL MESSAGES
+// Basic control and scheduler definition
+// Basic control -- basic control header for both tx and rx
+message Basic_ctrl {
+	enum TRX {
+		TRX_UNKNOWN	= 0;
+		RX					= 1;				// Radio needs to Listen on this (slot,ch)
+		TX					= 2;				// Radio can transmit a message on this (slot, ch)
+		//MAY HAVE SOME MORE STATUS IN THE FUTURE
+	};
+
+	TRX				trx_flag			= 1;	//Action on this (slot, ch)
+	uint32 		phy_id				= 2;
+	uint32		send_to				= 3;	//This field gives the ID of radio the we are sending a packet to.
+	uint32		intf_id				= 4;  //Interface ID. This field specifies to which radio interface a message is intended to.
+	BW_INDEX	bw_index 			= 5;	//Bandwidth (Channel Width)
+	uint32		ch						= 6;	//Channel, one channel occupies BW_INDEX MHz within the 80 MHz bandwidth. The 80 MHz BW contains 80/BW_INDEX channels.
+	uint32 		frame					= 7;  //Frame number
+	uint32		slot					= 8;	//Slot
+	uint64 		timestamp			= 9;	//Time at which slot should be sent given in milliseconds. It should be based on system time: struct timespec.
+	uint32		mcs						= 10;	//ONLY USED FOR TX
+	int32			gain					= 11;	//ONLY USED FOR TX
+	float 		rf_boost			= 12; //ONLY USED FOR TX
+	uint32    length 				= 13; //During TX state, it indicates number of bytes after this header. It must be an integer times the TB size. During RX indicates number of expected slots to be received.
+};
+
+//PHY STATS
+//PHY tx statistics
+message Phy_tx_stat {
+	int32  power								= 1; //tx gain dB
+	uint64 channel_free_cnt			= 2;
+	uint64 channel_busy_cnt			= 3;
+	float free_energy						= 4;
+	float busy_energy						= 5;
+	uint64 total_dropped_slots	= 6;
+	float coding_time						= 7;
+	float rf_boost							= 8;
+};
+
+//PHY rx statistics
+message Phy_rx_stat {
+	uint32	nof_slots_in_frame					= 1;
+	uint32	slot_counter								= 2;
+	int32 	gain												= 3; //RX gain. dB. For receiver, -1 means AGC mode. No need to control gain by outside.
+	uint32	cqi													= 4; //Channel quality Indicator [1, 15]
+	float		rssi												= 5; //Recieved Signal Strenght indicator. Range [-2^32, (2^32) -1], dBm*10. For example value -567 means -56.7 dBm.
+	float		rsrp												= 6; //Reference Signal Received Power. Range: [-1400, -400]. dBm*-10. For example value 567 means -56.7 dBm
+	float		rsrq												= 7; //Reference Signal Receive Quality. Range [-340, -25]. dB*-10. For example value 301 mens -30.1 dB.
+	float		sinr												= 8; //Signal to Interference plus Noice Ration. Range: [-2^31, 2^31 -1]. dB.
+	float 	cfo													= 9;
+	uint64 	detection_errors						= 10;
+  uint64 	decoding_errors							= 11;
+  float 	peak_value									= 12;
+  float 	noise												= 13;
+  uint32 	decoded_cfi									= 14;
+  bool 		found_dci 									= 15;
+  uint32 	last_noi										= 16;
+	uint64  total_packets_synchronized	= 17;
+	double  decoding_time								= 18;
+  double  synch_plus_decoding_time    = 19;
+	int32 	length											= 20; //How many bytes are after this header. It should be equal to current TB size.
+};
+
+//PHY Sensing statistics
+message Phy_sensing_stat {
+	float frequency			= 1;    // Central frequency used for sensing the channel.
+	float sample_rate		= 2;		// Sample rate used for sensing the channel.
+	float gain					= 3;    // RX gain used for sensing the channel.
+	float rssi					= 4;    // RSSI of the received IQ samples.
+	int32 length				= 5;		// How many bytes are after this header. It should be equal to current TB size.
+}
+
+//PHY statistics
+message Phy_stat {
+	uint32 phy_id						= 1;
+	uint64 host_timestamp		= 2;  //HOST PC TIME VALUE WHEN (ch, slot) MAC TB are received
+	uint64 fpga_timestamp		= 3;  //FPGA time when signal is transmitted, FPGA internal counter for global time slot
+	uint32 frame						= 4;  //Frame number
+	uint32 slot							= 5;  //Time slot number
+	uint32 ch								= 6;  //Channel number which inturn is translated to a centeral frequency
+	uint32 mcs							= 7;  //[0, 31]
+	uint32 num_cb_total			= 8;  //Number of cb transmitted in the (ch, slot)
+	uint32 num_cb_err				= 9; //If PHY ACK is there, we know how many cb get CRC error in the (ch, slot)
+	uint32 wrong_decoding_counter  = 10;
+
+	oneof stat{
+		Phy_tx_stat tx_stat		= 11;	//Extra statistics for TX stat
+		Phy_rx_stat rx_stat		= 12;	//Extra statistics for RX stat
+		Phy_sensing_stat sensing_stat = 13; //Extra statistics for Sensing stat
+	};
+};
+
+//Channel Emulator parameters.
+message Channel_emulator_config {
+	bool enable_simple_awgn_channel	= 1;
+	float noise_variance					 	= 2;
+	float snr												= 3;
+};
+
+//MAC STATS
+message Mac_ack_stat{
+    enum AckStatus {
+        ACKSTATUS_UNKNOWN   = 0;
+        ACKSTATUS_SUCCESS   = 1;
+        ACKSTATUS_FAILED    = 2;
+     }
+
+    uint64 destination_address      = 1; //Destination address where the ACK is received (Destination of the APP packet)
+    AckStatus status                = 2; //Success or Failure (ACK received or timeout)
+    uint32 mcs                      = 3; //MCS, [0, 31]
+    uint32 tx_gain                  = 4; //0 - 89 dB range
+    uint32 port                     = 5;
+    uint32 payload_size             = 6;
+    uint32 tx_channel               = 7; //Tx channel
+	uint32 slot_index               = 8; //Slot index
+    uint32 max_retries         		= 9; //Max number or retransmissions
+    uint32 num_retries              = 10; //Number or retransmissions
+    uint64 bytes_transmitted        = 11; //Overall bytes of successfully transmitted ACKs
+    Phy_rx_stat receiver_stats      = 12; //Incoming PHY stats if success
+
+};
+
+//MAC tx statistics
+message Mac_tx_stat {
+    repeated Mac_ack_stat    ack_stat = 1;
+};
+
+
+//MAC rx statistics
+message Mac_rx_stat {
+	uint32 num_byte_overflow_drop	= 1;	//How many bytes are dropped because of overflow
+	bool crc						= 2;	//Cyclic Redundancy Check. Range [0, 1]. Of the Transport Block's CRC is OK (TRUE), otherwise (FALSE)
+    uint32 tx_channel               = 3; 	//Tx channel
+    uint32 slot_index               = 4; 	//Slot index
+};
+
+//MAC queue statistics
+message Mac_queue_stat {
+	uint32				high_queue_size				= 1;
+	uint32				high_messages_in_queue 		= 2;
+	uint32				high_pkts_lost_overflow		= 3;		// Queue overflow
+	uint32				high_average_queue_delay	= 4;	// (Nanosecs)
+
+	uint32				low_queue_size				= 5;
+	uint32				low_messages_in_queue 		= 6;
+	uint32				low_pkts_lost_overflow		= 7;		// Queue overflow
+	uint32				low_average_queue_delay		= 8;	// (Nanosecs)
+
+	map<uint64, uint32> queue_inf					= 9; 	//Map from mac address to amount of packages (addressed to that address) are in the queue [Address => #]
+};
+
+//MAC statistics
+message Mac_stat {
+	message Cell_information {
+		uint32 ch							= 1; //Should be the same as phy_stat
+		uint32 slot							= 2; //Should be the same as phy_stat
+		uint32 num_byte_total				= 3; // How many bytes received/sent in (ch, slot), or many small TB to avoid big ARQ size. So byte is used here.
+		uint32 num_byte_crc_drop			= 4; //How many bytes are dropped because of CRC error (for TX only if ACK)
+
+		oneof rx_tx_stat {
+			Mac_tx_stat tx_stat				= 5;
+			Mac_rx_stat rx_stat 			= 6;
+		};
+	};
+	message Mac_send_stat{
+	    uint64 start_timestamp      = 1; //Start sending packets at this timestamp
+	    uint32 packet_count         = 2; //Number of packets being sent sequentially at start_timestamp
+	    uint32 ch                	= 3; //Tx channel
+	};
+	uint32 average_mac_delay			= 1;	//(Nanosecs) Processing time
+	uint32 pkts_lost_mac				= 2;	//Pkts lost because not able to access the medium
+	uint64 host_timestamp				= 3; 	//HOST PC TIME VALUE WHEN (ch, slot) MAC TB are received
+	uint64 fpga_timestamp				= 4; 	//FPGA time when signal is transmitted, FPGA internal counter for global time slot
+	uint64 frame								= 5; 	//Should be the same as phy_stat
+
+	oneof stat{
+		Cell_information rx_tx_stat 	= 6;
+		Mac_queue_stat	 queue_stat 	= 7;
+		Mac_send_stat	 send_stat 		= 8;
+	};
+
+};
+
+
+//RF-MONITOR
+message RF_timeslot_stat {
+	uint64 host_timestamp		= 1; //HOST PC TIME VALUE WHEN (ch, slot) MAC TB are received
+	uint64 fpga_timestamp		= 2; //FPGA time when signal is transmitted, FPGA internal counter for global time slot
+	uint64 frame				= 3;
+	uint32 slot					= 4;
+	repeated double	rssi		= 5;
+};
+
+//TODO: Implement these message in the Basic control messages
+message RF_stat {
+	repeated RF_timeslot_stat stats = 1;
+}
+
+
+//APPLICATION INTERNAL MESSAGES
+message Application_data {
+	enum PACKET_TYPE{
+		PACKET_TYPE_UNKNOWN			= 0;
+		IPv4						= 0x0800;
+		ARP							= 0x0806;
+	}
+
+	enum TRAFFIC_CLASS{
+		TRAFFIC_CLASS_UNKOWN		= 0;
+		VoIP						= 0x1;
+		FTP							= 0x2;
+		HTTP						= 0x3;
+		AI							= 0xE;
+		CONTROL						= 0xF;
+	}
+
+	uint64			next_mac				= 1;
+	fixed32			destination_ip			= 2;
+	PACKET_TYPE		packet_type				= 3;
+	TRAFFIC_CLASS	traffic_class			= 4;
+	uint32			priority				= 5;
+	bytes			data					= 6;
+	uint64      	timestamp               = 7;
+}
+
+message Link_MCS_TxGain_BW {
+
+	uint64	destination_mac		= 1;
+	uint32			mcs			= 2;
+	uint32	 		tx_gain 	= 3;
+	BW_INDEX		bw_index	= 4;
+
+}
+
+message Mandated_Flow_Block {
+
+	uint32 flow_id = 1;
+	bool is_blocked   = 2;
+}
+
+message MFTDMA_Slot {
+    uint32 frequency_num        = 1;
+    uint32 timeslot_num         = 2;
+}
+
+message Proposed_Slots_Request {
+	uint64 mac			= 1;
+	uint32 num_slots	= 2;
+}
+
+message Proposed_Slots {
+	uint64 mac					= 1;
+	repeated MFTDMA_Slot slots	= 2;
+	repeated uint32 interface_id = 3;
+}
+
+message Proposed_Move_Slots {
+	uint64 mac					= 1;
+	MFTDMA_Slot old_slot		= 2;
+	repeated MFTDMA_Slot slots	= 3;
+}
+
+message Selected_Slot {
+	uint64 mac			= 1;
+	MFTDMA_Slot slot	= 2;
+	uint32 interface_id = 3;
+}
+
+message Selected_Move_Slot {
+	uint64 mac				= 1;
+	MFTDMA_Slot old_slot	= 2;
+	MFTDMA_Slot new_slot	= 3;
+}
+
+message External_Slot_Allocation {
+	uint64 src_mac          = 1;
+	uint64 dst_mac			= 2;
+	MFTDMA_Slot slot        = 3;
+}
+
+message External_Slot_Removal {
+	uint64 src_mac          = 1;
+	uint64 dst_mac			= 2;
+	MFTDMA_Slot slot        = 3;
+}
+
+message BC_Slots_Announcement {
+	repeated MFTDMA_Slot slots = 1;
+}
+
+message Slot_Allocation {
+    uint64 mac              = 1; //Slot allocated for this mac
+    MFTDMA_Slot slot        = 2; //Specified slot
+    SLOT_MODE mode          = 3; //Mode: RX-TX
+}
+
+message Slot_Removal {
+    uint64 mac              = 1;
+    MFTDMA_Slot slot        = 2;
+}
+
+message Slot_Move {
+    uint64 mac              	= 1;
+    MFTDMA_Slot old_slot        = 2;
+    MFTDMA_Slot new_slot        = 3;
+    SLOT_MODE mode          	= 4;
+}
+
+message External_Slot_Move {
+	uint64 src_mac          = 1;
+	uint64 dst_mac			= 2;
+	MFTDMA_Slot old_slot    = 3;
+	MFTDMA_Slot new_slot    = 4;
+}
+
+message Modify_Duty_Cycle {
+	MFTDMA_Slot slot	= 1;
+	uint32 duty_cycle		= 2;
+}
+
+message MCS_Freeze {
+	uint64 dst_mac			= 1;
+	bool freeze				= 2;
+}
+
+message SlotPrediction_Input {
+	uint32 channels 		= 1;
+	uint32 timeslots		= 2;
+	repeated float observation = 3;			//[Timestamp, Channels]
+	repeated SLOT_MODE own_schedule = 4;	//[Timestamp, Channels] RXnoc data
+	repeated bool overall_schedule = 5;		//[Timestamp, Channels] True = (TX || RX)
+	repeated bool received_correctly = 6;	//[Timestamp, Channels]
+	repeated float snr = 7;					//[Timestamp, Channels]
+	uint64 timestamp = 8;					//Timestamp message was created
+}
+
+message SlotPrediction_NewValues {
+	uint32 channels 		= 1;
+	uint32 timeslots		= 2;
+	repeated float new_values = 3;			//[Timestamp, Channels]
+}
+
+message SlotPrediction {
+	oneof payload {
+		SlotPrediction_Input	 slot_prediction_input 		= 1;
+		SlotPrediction_NewValues slot_prediction_newvalues	= 2;
+	}
+}
+
+//To be removed?
+message ActiveFlowInformation {
+	uint32	flow_id	= 1;
+	uint32	packet_size = 2;
+	uint32	destination_ip = 3;
+	uint64	destination_mac = 4;
+	uint64  timestamp = 5;
+}
+
+// FileDeadlineTransferMandatePacket
+message FDTMP{
+	uint32 flow_id = 1;
+	uint64 bytes = 2;
+	uint64 num_pkts = 3;
+	uint64 timestamp_first = 4;
+	uint64 timestamp_last = 5;
+}
+
+message FlowBytes{
+	uint32	flow_id = 1;
+	uint32	num_pkts = 2;
+	uint32	num_bytes = 3;
+	uint64  timestamp_first = 4;
+	uint64  timestamp_last = 5;
+}
+
+message FlowInfo
+{
+	repeated FlowBytes flow_bytes = 1;
+}
+
+message NewFlowActive
+{
+	uint32 flow_id = 1;
+	uint32	packet_size = 2;
+	uint32	destination_ip = 3;
+	uint64	destination_mac = 4;
+	uint64  timestamp = 5;
+}
+
+message SpectrumVoxel{
+	double 		freq_start	= 1;
+	double 		freq_end	= 2;
+	uint64		time_start	= 3;
+	uint64		time_end	= 4;
+	double		duty_cycle	= 5;
+	double		period_time	= 6;
+	double		slot_time	= 7;
+	double		tx_power_db	= 8;
+	double		utility		= 9;
+	
+}
+
+message TeamSpectrumVoxelUsage{
+	uint32	team_id = 1;
+	repeated SpectrumVoxel spectrum = 2;
+}
+
+//============================================================
+//Basic control messages used in the overal Internal message
+//============================================================
+
+//
+message Get {
+
+	//Attributes available to get. Attributes form the PHY layer starts with 0x1__, Attributes from the MAC starts with 0x2__, Attributes from AI starts with 0x3__, Attributes form the RF_monitor starts with 0x4__
+	enum GET_ATTRIBUTE {
+		ATTRIBUTE_UNKNOWN		= 0x000;
+		PHY_BASIC_CONTROL		= 0x101;
+		MAC_STATS				= 0x201;
+		PROPOSED_SLOTS          = 0x301;
+		SELECTED_SLOT           = 0x302;
+		SELECTED_MOVE_SLOT      = 0x303;
+	};
+
+	GET_ATTRIBUTE attribute		        			= 1;
+	oneof payload {
+		Proposed_Slots_Request slot_request			= 2; //Payload for type PROPOSED_SLOTS
+		Proposed_Slots proposed_slots				= 3; //Payload for type SELECTED_SLOT
+		Proposed_Move_Slots proposed_move_slots		= 4; //Payload for type SELECTED_MOVE_SLOT
+	}
+};
+
+message Get_r {
+	oneof payload {
+		Mac_stat			mac_stat			= 1;
+		Basic_ctrl			basic_ctrl			= 2;
+		Proposed_Slots 		proposed_slots		= 3; //Response for the PROPOSED_SLOTS get message
+		Selected_Slot		selected_slot		= 4; //Response for the SELECTED_SLOT get message
+		Selected_Move_Slot	selected_move_slot	= 5; //Response for the SELECTED_MOVE_SLOT get message
+	}
+}
+
+message Set {
+	oneof payload {
+		//Mac_stat		mac_stat	= 1;
+		//uint32			mcs			= 1;
+		Link_MCS_TxGain_BW mcs_txgain_bw 		= 1;
+		uint32 ch = 2;
+		External_Slot_Allocation external_slot_allocation = 3;
+		External_Slot_Removal external_slot_removal = 4;
+		Slot_Allocation slot_allocation = 5;
+		Slot_Removal    slot_removal = 6;
+        BC_Slots_Announcement bc_slots_announcement = 7;
+        bool outcomes_updated = 8;
+        External_Slot_Move external_slot_move = 9;
+        Proposed_Move_Slots proposed_move_slots = 10;
+        Slot_Move slot_move = 11;
+        Mandated_Flow_Block mandated_flow_block= 12;
+        bool environment_updated = 13;
+        SlotPrediction slot_prediction = 14;
+		MCS_Freeze mcs_freeze = 15;
+		FDTMP fdtmp = 16;
+		ActiveFlowInformation activeflow = 17;
+		NewFlowActive newflow = 18;
+		uint64	start_timestamp	= 19;
+		FlowInfo flowinfo = 20;
+		Modify_Duty_Cycle modify_duty_cycle = 21;
+		TeamSpectrumVoxelUsage teamVoxelUsage = 22;
+		aiCommunicator.SpectrumVoxelChannelFilter voxel_filter = 23;
+	}
+}
+
+message Set_r {
+	TRANSACTION_RESULT result	= 1;
+	uint32 interface_id			= 2;
+}
+
+message Send {
+	Application_data	app_data 	= 1;
+	Basic_ctrl			basic_ctrl	= 2	;
+}
+
+message Send_r {
+	TRANSACTION_RESULT result	= 1;
+	oneof payload {
+		Phy_stat		phy_stat	= 2;	//ANSWER WITH PHY_STAT with PHY_STAT_TX
+		Mac_stat		mac_result	= 3;	//ANSWER WITH MAC_STAT with MAC_STAT_TX
+	}
+}
+
+message Receive {
+	oneof payload {
+		Basic_ctrl							basic_ctrl							= 1;
+		bytes										data										= 2;
+		Channel_emulator_config	channel_emulator_config	= 3;
+	}
+}
+
+message Receive_r {
+    TRANSACTION_RESULT result		= 1;
+    bytes        data        		= 2;		//Data (TB) received and decoded by the PHY.
+    Phy_stat    stat                = 3;    //USE PHY_STAT_RX INSIDE THE PHY_STAT MESSAGE
+}
+
+message Stats {
+
+		uint64		mac_address			= 1;
+		Phy_stat	phy_stat			= 2;
+		Mac_stat	mac_stat			= 3;
+
+}
+
+//============================================================
+//The following section contains the top level wrapper message
+//============================================================
+
+//Every message that is sended through another internal module must be encapsulated in InternalMessage
+message Internal{
+
+	uint64		transaction_index 	= 1;
+	MODULE		owner_module 		= 2;
+	oneof payload {
+		// See GET documentation
+		Get 	get					= 3;
+
+		// See GET_R documentation
+		Get_r 	getr 				= 4;
+
+		// See SET documentation
+		Set 	set 				= 5;
+
+		// See SET_R documentation
+		Set_r 	setr 				= 6;
+
+		// See SEND documentation
+		Send 	send 				= 7;
+
+		// See SEND_R documentation
+		Send_r 	sendr 				= 8;
+
+		// See RECEIVE documentation
+		Receive receive 			= 9;
+
+		// See RECEIVE_R documentation
+		Receive_r receiver 			= 10;
+
+		//See STATS documentation
+		Stats 	stats 				= 11;
+
+		//See InterAi.proto file
+		aiCommunicator.InternalAI externalAImessage	= 12;
+	}
+}
+
+// [END messages]

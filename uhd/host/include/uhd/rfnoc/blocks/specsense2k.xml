@@ -1,0 +1,104 @@
+<!--This defines one NoC-Block.-->
+<nocblock>
+  <name>SpecSense2k</name>
+  <blockname>SpecSense2k</blockname>
+  <key>SpecSense2k</key>
+  <!--There can be several of these:-->
+  <ids>
+    <id revision="0">FF78</id>
+  </ids>
+  <!-- Registers -->
+  <registers>
+    <!--Note: AXI config bus uses 129 & 130, 131 & 132-->
+    <setreg>
+      <name>FFT_RESET</name>
+      <address>133</address>
+    </setreg>
+    <setreg>
+      <name>AVG_SIZE</name>
+      <address>134</address>
+    </setreg>
+    <setreg>
+      <name>AXIS_CONFIG_BUS_1</name>
+      <address>131</address>
+    </setreg>
+    <readback>
+      <name>RB_FFT_RESET</name>
+      <address>0</address>
+    </readback>
+  </registers>
+  <!-- Args -->
+  <args>
+    <arg>
+      <name>otype</name>
+      <type>string</type>
+      <value>sc16</value>
+      <check>EQUAL($otype, "sc16")</check>
+      <check_message>Output data type must be sc16.</check_message>
+      <!--TODO: Check against mag-out value (requires GET() function) -->
+    </arg>
+    <arg>
+      <name>reset</name>
+      <type>int</type>
+      <value>1</value>
+      <action>
+          IF(NOT(EQUAL($reset, 0)), SR_WRITE("FFT_RESET", 1) AND SR_WRITE("FFT_RESET", 0))
+      </action>
+    </arg>
+    <arg>
+      <name>fft_size</name>
+      <type>int</type>
+      <value>1024</value>
+    </arg>
+
+    <arg>
+      <name>fft_direction</name>
+      <type>int</type>
+      <value>1</value>
+    </arg>
+
+    <arg>
+      <name>fft_scaling_sch</name>
+      <type>int</type>
+      <value>175</value><!--0x00AF  Or 175-->
+    </arg>
+
+    <arg>
+      <name>avg_size</name>
+      <type>int</type>
+      <value>64</value>
+    </arg>
+  </args>
+  <!--All the connections to the outside world are listed in 'ports':-->
+  <ports>
+    <sink>
+      <name>in</name>
+      <type>sc16</type>
+      <vlen>$fft_size</vlen> <!--temporary -->
+      <!--pkt_size>$spp</pkt_size-->
+    </sink>
+    <source>
+      <name>out</name>
+      <type>$otype</type> <!---TODO make this dependent on the output type -->
+      <vlen>$fft_size</vlen>
+      <!--pkt_size>$spp</pkt_size-->
+    </source>
+  </ports>
+  <!--<components>-->
+    <!--<component>-->
+      <!--<key revision="1">nocshell</key>-->
+    <!--</component>-->
+    <!--<component srbase="0">-->
+      <!--[>Will look for a component with this key:<]-->
+      <!--<key revision="1">componentname</key>-->
+    <!--</component>-->
+  <!--</components>-->
+  <!--<connection>-->
+    <!--<source port="0">nocshell</source>-->
+    <!--<sink port="0">componentname</sink>-->
+  <!--</connection>-->
+  <!--<connection>-->
+    <!--<source port="0">componentname</source>-->
+    <!--<sink port="0">nocshell</sink>-->
+  <!--</connection>-->
+</nocblock>

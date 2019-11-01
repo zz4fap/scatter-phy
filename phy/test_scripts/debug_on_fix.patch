@@ -1,0 +1,503 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 09aff7e..de48295 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -3,7 +3,20 @@ execute_process(COMMAND /bin/bash compileProto.sh WORKING_DIRECTORY ${PROJECT_SO
+ message("Output: '${proto_res}'")
+ 
+ cmake_minimum_required(VERSION 2.8)
+-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -Wall")
++
++if(NOT CMAKE_BUILD_TYPE)
++   set(CMAKE_BUILD_TYPE Release)
++   message(STATUS "Build type not specified: defaulting to Release.")
++endif(NOT CMAKE_BUILD_TYPE)
++set(CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE} CACHE STRING "")
++
++if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
++  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -Wall")
++  add_definitions(-O0)
++else(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
++  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -Wall")
++  add_definitions(-O3)
++endif(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
+ 
+ OPTION(SCATTER_DEBUG_MODE "PHY Debugging mode" OFF) # Disabled by default
+ IF(SCATTER_DEBUG_MODE)
+@@ -12,7 +25,6 @@ ENDIF(SCATTER_DEBUG_MODE)
+ 
+ SET(LIBS protobuf zmq m boost_thread pthread)
+ 
+-add_definitions(-O3)
+ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+ include_directories(anyoption)
+ include_directories(logging)
+diff --git a/phy/srslte/examples/check_discontinous_tx.c b/phy/srslte/examples/check_discontinous_tx.c
+index ca61a49..a597d6b 100644
+--- a/phy/srslte/examples/check_discontinous_tx.c
++++ b/phy/srslte/examples/check_discontinous_tx.c
+@@ -103,6 +103,7 @@ int main(int argc, char *argv[]) {
+ }
+ 
+ // This function returns timestamp with microseconds precision.
++extern uint64_t get_host_time_now_us();
+ inline uint64_t get_host_time_now_us() {
+   struct timespec host_timestamp;
+   // Retrieve current time from host PC.
+@@ -111,6 +112,7 @@ inline uint64_t get_host_time_now_us() {
+ }
+ 
+ // This function returns timestamp with miliseconds precision.
++extern uint64_t get_host_time_now_ms();
+ inline uint64_t get_host_time_now_ms() {
+   struct timespec host_timestamp;
+   // Retrieve current time from host PC.
+diff --git a/phy/srslte/examples/check_tx_timestamps.c b/phy/srslte/examples/check_tx_timestamps.c
+index 14119e2..d40aa04 100644
+--- a/phy/srslte/examples/check_tx_timestamps.c
++++ b/phy/srslte/examples/check_tx_timestamps.c
+@@ -98,6 +98,7 @@ int main(int argc, char *argv[]) {
+ }
+ 
+ // This function returns timestamp with microseconds precision.
++extern uint64_t get_host_time_now_us();
+ inline uint64_t get_host_time_now_us() {
+   struct timespec host_timestamp;
+   // Retrieve current time from host PC.
+@@ -106,6 +107,7 @@ inline uint64_t get_host_time_now_us() {
+ }
+ 
+ // This function returns timestamp with miliseconds precision.
++extern uint64_t get_host_time_now_ms();
+ inline uint64_t get_host_time_now_ms() {
+   struct timespec host_timestamp;
+   // Retrieve current time from host PC.
+diff --git a/phy/srslte/examples/fir_filter_checking.c b/phy/srslte/examples/fir_filter_checking.c
+index 93789da..8f45ed3 100644
+--- a/phy/srslte/examples/fir_filter_checking.c
++++ b/phy/srslte/examples/fir_filter_checking.c
+@@ -153,6 +153,7 @@ void default_args(tput_test_args_t *args) {
+ }
+ 
+ // This function returns timestamp with microseconds precision.
++extern uint64_t get_host_time_now_us();
+ inline uint64_t get_host_time_now_us() {
+   struct timespec host_timestamp;
+   // Retrieve current time from host PC.
+diff --git a/phy/srslte/examples/fir_filter_checking_mac_like.c b/phy/srslte/examples/fir_filter_checking_mac_like.c
+index 366f759..e41a149 100644
+--- a/phy/srslte/examples/fir_filter_checking_mac_like.c
++++ b/phy/srslte/examples/fir_filter_checking_mac_like.c
+@@ -143,6 +143,7 @@ void change_process_priority(int inc) {
+ }
+ 
+ // This function returns timestamp with microseconds precision.
++extern uint64_t get_host_time_now_us();
+ inline uint64_t get_host_time_now_us() {
+   struct timespec host_timestamp;
+   // Retrieve current time from host PC.
+diff --git a/phy/srslte/examples/helpers.h b/phy/srslte/examples/helpers.h
+index 77524e7..0b9faa6 100644
+--- a/phy/srslte/examples/helpers.h
++++ b/phy/srslte/examples/helpers.h
+@@ -78,7 +78,7 @@ void helpers_print_subframe_buffer(cf_t* const buffer, uint32_t length);
+ //******************************************************************************
+ 
+ // This function returns time in Milliseconds
+-inline double fpga_time_diff(time_t full_secs_start, double frac_secs_start, time_t full_secs_end, double frac_secs_end) {
++static inline double fpga_time_diff(time_t full_secs_start, double frac_secs_start, time_t full_secs_end, double frac_secs_end) {
+ 
+   double diff_full_secs, diff_frac_secs;
+ 
+@@ -94,7 +94,7 @@ inline double fpga_time_diff(time_t full_secs_start, double frac_secs_start, tim
+ }
+ 
+ // This function returns time in Milliseconds
+-inline double helpers_time_diff(struct timespec *start, struct timespec *stop) {
++static inline double helpers_time_diff(struct timespec *start, struct timespec *stop) {
+ 
+   struct timespec diff;
+ 
+@@ -109,7 +109,7 @@ inline double helpers_time_diff(struct timespec *start, struct timespec *stop) {
+   return (double)(diff.tv_sec*1000) + (double)(diff.tv_nsec/1.0e6);
+ }
+ 
+-inline void helpers_get_timeout(long timeout, struct timespec *timeout_spec) {
++static inline void helpers_get_timeout(long timeout, struct timespec *timeout_spec) {
+   struct timespec now;
+   clock_gettime(CLOCK_REALTIME, &now);
+   if((now.tv_nsec + timeout) > 999999999) {
+@@ -122,7 +122,7 @@ inline void helpers_get_timeout(long timeout, struct timespec *timeout_spec) {
+ }
+ 
+ // Function used to verify if this is time to timeout reception.
+-inline bool helpers_is_timeout(struct timespec time_start, double timeout) {
++static inline bool helpers_is_timeout(struct timespec time_start, double timeout) {
+   bool ret  = false;
+   struct timespec time_now;
+   clock_gettime(CLOCK_REALTIME, &time_now);
+@@ -133,8 +133,8 @@ inline bool helpers_is_timeout(struct timespec time_start, double timeout) {
+   return ret;
+ }
+ 
+-// Retrieve host PC time value now in microseconds.
+-inline uint64_t helpers_get_host_time_now() {
++// Retrieve host PC time value now
++static inline uint64_t helpers_get_host_time_now() {
+   struct timespec host_timestamp;
+   // Retrieve current time from host PC.
+   clock_gettime(CLOCK_REALTIME, &host_timestamp);
+@@ -142,17 +142,17 @@ inline uint64_t helpers_get_host_time_now() {
+ }
+ 
+ // Convert to a timestamp in microseconds.
+-inline uint64_t helpers_convert_host_time_now(struct timespec *host_timestamp) {
++static inline uint64_t helpers_convert_host_time_now(struct timespec *host_timestamp) {
+   return (uint64_t)host_timestamp->tv_sec*1000000LL + (uint64_t)((double)host_timestamp->tv_nsec/1000LL);
+ }
+ 
+ // Convert to timestamp in nanoseconds.
+-inline uint64_t helpers_convert_host_timestamp(struct timespec *timestamp) {
++static inline uint64_t helpers_convert_host_timestamp(struct timespec *timestamp) {
+   return (uint64_t)timestamp->tv_sec*1000000000LL + (uint64_t)(timestamp->tv_nsec/1LL);
+ }
+ 
+ // Retrieve FPGA time value now
+-inline uint64_t helpers_get_fpga_time_now(srslte_rf_t *rf) {
++static inline uint64_t helpers_get_fpga_time_now(srslte_rf_t *rf) {
+   time_t secs;
+   double frac_secs;
+   // Retrieve current time from USRP hardware.
+@@ -161,26 +161,26 @@ inline uint64_t helpers_get_fpga_time_now(srslte_rf_t *rf) {
+ }
+ 
+ // Retrieve FPGA time value now with precision in microseconds.
+-inline uint64_t helpers_convert_fpga_time_into_int(time_t full_secs, double frac_secs) {
++static inline uint64_t helpers_convert_fpga_time_into_int(time_t full_secs, double frac_secs) {
+   return (full_secs*1000000 + frac_secs*1000000); 	// FPGA internal counter for global time slot synchronization
+ }
+ 
+ // Retrieve FPGA time value now with precision in nanoseconds.
+-inline uint64_t helpers_convert_fpga_time_into_uint64_nanoseconds(time_t full_secs, double frac_secs) {
++static inline uint64_t helpers_convert_fpga_time_into_uint64_nanoseconds(time_t full_secs, double frac_secs) {
+   return (full_secs*1000000000 + frac_secs*1000000000); 	// FPGA internal counter for global time slot synchronization
+ }
+ 
+-inline uint64_t helpers_convert_fpga_time_into_int2(srslte_timestamp_t timestamp) {
++static inline uint64_t helpers_convert_fpga_time_into_int2(srslte_timestamp_t timestamp) {
+   return (timestamp.full_secs*1000000 + timestamp.frac_secs*1000); 	// FPGA internal counter for global time slot synchronization
+ }
+ 
+-inline double helpers_profiling_diff_time(struct timespec *timestart) {
++static inline double helpers_profiling_diff_time(struct timespec *timestart) {
+   struct timespec timeend;
+   clock_gettime(CLOCK_REALTIME, &timeend);
+   return helpers_time_diff(timestart, &timeend);
+ }
+ 
+-inline uintmax_t helpers_get_current_frame_slot(unsigned int *frame, unsigned int *slot) {
++static inline uintmax_t helpers_get_current_frame_slot(unsigned int *frame, unsigned int *slot) {
+    struct timespec host_time_now;
+    // Retrieve current time from host PC.
+    clock_gettime(CLOCK_REALTIME, &host_time_now);
+@@ -190,7 +190,7 @@ inline uintmax_t helpers_get_current_frame_slot(unsigned int *frame, unsigned in
+    return time_now_in_milliseconds;
+ }
+ 
+-inline uintmax_t helpers_get_time_in_future(unsigned int future_frame, unsigned int future_slot, unsigned int current_frame, unsigned int current_slot) {
++static inline uintmax_t helpers_get_time_in_future(unsigned int future_frame, unsigned int future_slot, unsigned int current_frame, unsigned int current_slot) {
+ 
+    if(future_slot < current_slot) {
+       current_frame = future_frame - current_frame - 1;
+@@ -203,7 +203,7 @@ inline uintmax_t helpers_get_time_in_future(unsigned int future_frame, unsigned
+    return (current_frame*FRAME_DURATION + current_slot*SLOT_DURATION);
+ }
+ 
+-inline void helpers_increment_frame_subframe(unsigned int *frame, unsigned int *slot) {
++static inline void helpers_increment_frame_subframe(unsigned int *frame, unsigned int *slot) {
+   if(*slot == SLOT_LENGTH-1) {
+     *slot = 0;
+     if(*frame == FRAME_LENGTH-1) {
+@@ -217,7 +217,7 @@ inline void helpers_increment_frame_subframe(unsigned int *frame, unsigned int *
+ }
+ 
+ // convert into miliseconds.
+-inline void helpers_convert_host_timestamp_into_uhd_timestamp_ms(uint64_t timestamp, time_t *full_secs, double *frac_secs) {
++static inline void helpers_convert_host_timestamp_into_uhd_timestamp_ms(uint64_t timestamp, time_t *full_secs, double *frac_secs) {
+   *full_secs = (time_t)(timestamp/1000LL);
+   uint64_t aux = timestamp - ((*full_secs)*1000LL);
+   *frac_secs = aux/1000.0;
+@@ -225,7 +225,7 @@ inline void helpers_convert_host_timestamp_into_uhd_timestamp_ms(uint64_t timest
+ }
+ 
+ // convert into microseconds.
+-inline void helpers_convert_host_timestamp_into_uhd_timestamp_us(uint64_t timestamp, time_t *full_secs, double *frac_secs) {
++static inline void helpers_convert_host_timestamp_into_uhd_timestamp_us(uint64_t timestamp, time_t *full_secs, double *frac_secs) {
+   *full_secs = (time_t)(timestamp/1000000LL);
+   uint64_t aux = timestamp - ((*full_secs)*1000000LL);
+   *frac_secs = aux/1000000.0;
+@@ -233,7 +233,7 @@ inline void helpers_convert_host_timestamp_into_uhd_timestamp_us(uint64_t timest
+ }
+ 
+ // convert into nanoseconds.
+-inline void helpers_convert_host_timestamp_into_uhd_timestamp_ns(uint64_t timestamp, time_t *full_secs, double *frac_secs) {
++static inline void helpers_convert_host_timestamp_into_uhd_timestamp_ns(uint64_t timestamp, time_t *full_secs, double *frac_secs) {
+   *full_secs = (time_t)(timestamp/1000000000LL);
+   uint64_t aux = timestamp - ((*full_secs)*1000000000LL);
+   *frac_secs = aux/1000000000.0;
+@@ -241,7 +241,7 @@ inline void helpers_convert_host_timestamp_into_uhd_timestamp_ns(uint64_t timest
+ }
+ 
+ // This function returns timestamp with microseconds precision.
+-inline uint64_t helpers_get_host_timestamp() {
++static inline uint64_t helpers_get_host_timestamp() {
+   struct timespec host_timestamp;
+   // Retrieve current time from host PC.
+   clock_gettime(CLOCK_REALTIME, &host_timestamp);
+@@ -249,7 +249,7 @@ inline uint64_t helpers_get_host_timestamp() {
+ }
+ 
+ // This function returns FPGA timestamp with miliseconds precision.
+-inline uint64_t helpers_get_fpga_timestamp_ms(srslte_rf_t *rf) {
++static inline uint64_t helpers_get_fpga_timestamp_ms(srslte_rf_t *rf) {
+   time_t secs;
+   double frac_secs;
+   // Retrieve current time from USRP hardware.
+@@ -258,7 +258,7 @@ inline uint64_t helpers_get_fpga_timestamp_ms(srslte_rf_t *rf) {
+ }
+ 
+ // This function returns FPGA timestamp with microseconds precision.
+-inline uint64_t helpers_get_fpga_timestamp_us(srslte_rf_t *rf) {
++static inline uint64_t helpers_get_fpga_timestamp_us(srslte_rf_t *rf) {
+   time_t full_secs;
+   double frac_secs;
+   // Retrieve current time from USRP hardware.
+@@ -266,7 +266,7 @@ inline uint64_t helpers_get_fpga_timestamp_us(srslte_rf_t *rf) {
+   return (full_secs*1000000 + frac_secs*1000000);
+ }
+ 
+-inline int helpers_get_fft_size(uint32_t nof_prb) {
++static inline int helpers_get_fft_size(uint32_t nof_prb) {
+   if(nof_prb <= 0) {
+     return SRSLTE_ERROR;
+   }
+@@ -287,13 +287,13 @@ inline int helpers_get_fft_size(uint32_t nof_prb) {
+   }
+ }
+ 
+-inline int helpers_non_std_sampling_freq_hz(uint32_t nof_prb) {
++static inline int helpers_non_std_sampling_freq_hz(uint32_t nof_prb) {
+   int n = helpers_get_fft_size(nof_prb);
+   return 15000 * n;
+ }
+ 
+ // Calculate central frequency for the channel.
+-inline double helpers_calculate_channel_center_frequency(double center_frequency, double competition_bw, double phy_bandwidth, uint32_t channel) {
++static inline double helpers_calculate_channel_center_frequency(double center_frequency, double competition_bw, double phy_bandwidth, uint32_t channel) {
+   double rx_channel_center_freq = (center_frequency - (competition_bw/2.0) + (phy_bandwidth/2.0) + channel*phy_bandwidth);
+   return rx_channel_center_freq;
+ }
+@@ -325,7 +325,7 @@ static inline void helpers_measure_packets_per_second(char *str) {
+   }
+ }
+ 
+-inline void helpers_print_resource_grid(cf_t* const vector, uint32_t length, uint32_t nof_re) {
++static inline void helpers_print_resource_grid(cf_t* const vector, uint32_t length, uint32_t nof_re) {
+   uint32_t symbol_cnt = 0;
+   for(uint32_t idx = 0; idx < length; idx++) {
+     if((idx%nof_re) == 0) {
+@@ -339,14 +339,14 @@ inline void helpers_print_resource_grid(cf_t* const vector, uint32_t length, uin
+   }
+ }
+ 
+-inline void helpers_print_resource_grid_gt_zero(cf_t* const vector, uint32_t length) {
++static inline void helpers_print_resource_grid_gt_zero(cf_t* const vector, uint32_t length) {
+   for(uint32_t idx = 0; idx < length; idx++) {
+     if(fabs(crealf(vector[idx])) > 0.0 || fabs(cimagf(vector[idx])) > 0.0)
+       printf("sample[%d]: (%f,%f)\n", idx, __real__ vector[idx], __imag__ vector[idx]);
+   }
+ }
+ 
+-inline uint32_t helpers_get_bw_index(uint32_t index) {
++static inline uint32_t helpers_get_bw_index(uint32_t index) {
+   uint32_t bw_idx;
+   switch(index) {
+     case BW_IDX_OneDotFour:
+@@ -374,7 +374,7 @@ inline uint32_t helpers_get_bw_index(uint32_t index) {
+   return bw_idx;
+ }
+ 
+-inline uint32_t helpers_get_prb_from_bw_index(uint32_t bw_idx) {
++static inline uint32_t helpers_get_prb_from_bw_index(uint32_t bw_idx) {
+   uint32_t nof_prb;
+   switch(bw_idx) {
+     case BW_IDX_OneDotFour:
+@@ -401,7 +401,7 @@ inline uint32_t helpers_get_prb_from_bw_index(uint32_t bw_idx) {
+   return nof_prb;
+ }
+ 
+-inline uint32_t helpers_get_bw_index_from_prb(uint32_t nof_prb) {
++static inline uint32_t helpers_get_bw_index_from_prb(uint32_t nof_prb) {
+   uint32_t bw_idx;
+   switch(nof_prb) {
+     case 6:
+@@ -429,7 +429,7 @@ inline uint32_t helpers_get_bw_index_from_prb(uint32_t nof_prb) {
+ }
+ 
+ // Convert bandwidth passed through command line to number of physical resource blocks.
+-inline uint32_t helpers_get_prb_from_bw(uint32_t bw) {
++static inline uint32_t helpers_get_prb_from_bw(uint32_t bw) {
+   uint32_t prb;
+   switch(bw) {
+     case 1400000:
+@@ -458,7 +458,7 @@ inline uint32_t helpers_get_prb_from_bw(uint32_t bw) {
+ 
+ #if(USE_NOMINAL_BW==1)
+ // This is the function used when we want a guard band of 250 KHz between channels.
+-inline double helpers_get_bw_from_nprb(uint32_t nof_prb) {
++static inline double helpers_get_bw_from_nprb(uint32_t nof_prb) {
+   double bw;
+   switch(nof_prb) {
+     case 6:
+@@ -485,7 +485,7 @@ inline double helpers_get_bw_from_nprb(uint32_t nof_prb) {
+   return bw;
+ }
+ 
+-inline float helpers_get_bandwidth_float(uint32_t index) {
++static inline float helpers_get_bandwidth_float(uint32_t index) {
+   float bw;
+   switch(index) {
+     case BW_IDX_OneDotFour:
+@@ -513,7 +513,7 @@ inline float helpers_get_bandwidth_float(uint32_t index) {
+   return bw;
+ }
+ 
+-inline float helpers_get_bandwidth(uint32_t index, uint32_t *bw_idx) {
++static inline float helpers_get_bandwidth(uint32_t index, uint32_t *bw_idx) {
+   // Retrieve BW as a float number.
+   float bw = helpers_get_bandwidth_float(index);
+   // Retrieve BW index so that we can index the array with TB sizes.
+@@ -526,7 +526,7 @@ inline float helpers_get_bandwidth(uint32_t index, uint32_t *bw_idx) {
+ // This is the function used when we don't want a guard band of 250 KHz between channels.
+ // The channels will be closer to each other. They will start just after the useful channel BW, e.g.,
+ // for 5 MHz PHY BW the useful BW is 25*12*15000 = 4.5 MHz.
+-inline double helpers_get_bw_from_nprb(uint32_t nof_prb) {
++static inline double helpers_get_bw_from_nprb(uint32_t nof_prb) {
+   double bw;
+   switch(nof_prb) {
+     case 6:
+@@ -553,7 +553,7 @@ inline double helpers_get_bw_from_nprb(uint32_t nof_prb) {
+   return bw;
+ }
+ 
+-inline float helpers_get_bandwidth_float(uint32_t index) {
++static inline float helpers_get_bandwidth_float(uint32_t index) {
+   float bw;
+   switch(index) {
+     case BW_IDX_OneDotFour:
+@@ -581,7 +581,7 @@ inline float helpers_get_bandwidth_float(uint32_t index) {
+   return bw;
+ }
+ 
+-inline float helpers_get_bandwidth(uint32_t index, uint32_t *bw_idx) {
++static inline float helpers_get_bandwidth(uint32_t index, uint32_t *bw_idx) {
+   // Retrieve BW as a float number.
+   float bw = helpers_get_bandwidth_float(index);
+   // Retrieve BW index so that we can index the array with TB sizes.
+@@ -591,7 +591,7 @@ inline float helpers_get_bandwidth(uint32_t index, uint32_t *bw_idx) {
+ 
+ #endif // USE_NOMINAL_BW
+ 
+-inline void helpers_check_error(int rc) {
++static inline void helpers_check_error(int rc) {
+   switch(rc) {
+     case EBUSY:
+       printf("EBUSY\n");
+@@ -610,7 +610,7 @@ inline void helpers_check_error(int rc) {
+   }
+ }
+ 
+-inline void helpers_get_error_string(int rc, char * error) {
++static inline void helpers_get_error_string(int rc, char * error) {
+   switch(rc) {
+     case EBUSY:
+       sprintf(error,"EBUSY");
+diff --git a/phy/srslte/examples/measure_throughput.c b/phy/srslte/examples/measure_throughput.c
+index 549e1b8..1f99ef7 100644
+--- a/phy/srslte/examples/measure_throughput.c
++++ b/phy/srslte/examples/measure_throughput.c
+@@ -234,6 +234,7 @@ void tx_side(tput_context_t *tput_context) {
+ }
+ 
+ // This function returns timestamp with microseconds precision.
++extern uint64_t get_host_time_now_us();
+ inline uint64_t get_host_time_now_us() {
+   struct timespec host_timestamp;
+   // Retrieve current time from host PC.
+@@ -241,12 +242,14 @@ inline uint64_t get_host_time_now_us() {
+   return (uint64_t)(host_timestamp.tv_sec*1000000LL) + (uint64_t)((double)host_timestamp.tv_nsec/1000LL);
+ }
+ 
++extern double profiling_diff_time(struct timespec *timestart);
+ inline double profiling_diff_time(struct timespec *timestart) {
+   struct timespec timeend;
+   clock_gettime(CLOCK_REALTIME, &timeend);
+   return time_diff(timestart, &timeend);
+ }
+ 
++extern double time_diff(struct timespec *start, struct timespec *stop) ;
+ inline double time_diff(struct timespec *start, struct timespec *stop) {
+   struct timespec diff;
+   if(stop->tv_nsec < start->tv_nsec) {
+diff --git a/phy/srslte/examples/measure_throughput_fd_auto.c b/phy/srslte/examples/measure_throughput_fd_auto.c
+index d077089..9de21b4 100644
+--- a/phy/srslte/examples/measure_throughput_fd_auto.c
++++ b/phy/srslte/examples/measure_throughput_fd_auto.c
+@@ -292,6 +292,7 @@ int stop_tx_side_thread(tput_context_t *tput_context) {
+ }
+ 
+ // This function returns timestamp with microseconds precision.
++extern uint64_t get_host_time_now_us();
+ inline uint64_t get_host_time_now_us() {
+   struct timespec host_timestamp;
+   // Retrieve current time from host PC.
+@@ -299,12 +300,14 @@ inline uint64_t get_host_time_now_us() {
+   return (uint64_t)(host_timestamp.tv_sec*1000000LL) + (uint64_t)((double)host_timestamp.tv_nsec/1000LL);
+ }
+ 
++extern double profiling_diff_time(struct timespec *timestart);
+ inline double profiling_diff_time(struct timespec *timestart) {
+   struct timespec timeend;
+   clock_gettime(CLOCK_REALTIME, &timeend);
+   return time_diff(timestart, &timeend);
+ }
+ 
++extern double time_diff(struct timespec *start, struct timespec *stop);
+ inline double time_diff(struct timespec *start, struct timespec *stop) {
+   struct timespec diff;
+   if(stop->tv_nsec < start->tv_nsec) {
+diff --git a/phy/srslte/examples/stress_test.c b/phy/srslte/examples/stress_test.c
+index ae14c30..6344866 100644
+--- a/phy/srslte/examples/stress_test.c
++++ b/phy/srslte/examples/stress_test.c
+@@ -289,6 +289,7 @@ int stop_tx_side_thread(tput_context_t *tput_context) {
+ }
+ 
+ // This function returns timestamp with microseconds precision.
++extern uint64_t get_host_time_now_us();
+ inline uint64_t get_host_time_now_us() {
+   struct timespec host_timestamp;
+   // Retrieve current time from host PC.
+diff --git a/phy/srslte/examples/trx.h b/phy/srslte/examples/trx.h
+index aebf993..f48240d 100644
+--- a/phy/srslte/examples/trx.h
++++ b/phy/srslte/examples/trx.h
+@@ -112,7 +112,7 @@ void trx_verify_environment_update_file_existence(transceiver_args_t* args);
+ static void trx_watchdog_handler(int sig, siginfo_t *info, void *ptr);
+ 
+ // Set FPGA time now to host time.
+-inline void trx_set_fpga_time(srslte_rf_t *rf) {
++static inline void trx_set_fpga_time(srslte_rf_t *rf) {
+   struct timespec host_time_now;
+   // Retrieve current time from host PC.
+   clock_gettime(CLOCK_REALTIME, &host_time_now);
