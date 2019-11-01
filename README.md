@@ -13,8 +13,13 @@ Install gnuradio FROM SOURCE!!!. Now only gnuradio 3.7.10.1 is verified. Newer v
 
 Then:
 git clone https://github.com/zz4fap/scatter-phy.git
+
 cd scatter/phy
+
 mkdir build
+
 cd build
+
 cmake ../
+
 make
